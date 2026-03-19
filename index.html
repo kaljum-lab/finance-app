@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Raharakendus">
+<title>Raharakendus</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f4f0;--card:#fff;--border:rgba(0,0,0,0.07);--text:#18180f;--muted:#72726a;
+  --accent:#0f6e56;--accent-bg:#e1f5ee;--accent-mid:#1d9e75;
+  --danger:#a32d2d;--danger-bg:#fcebeb;--danger-mid:#e24b4a;
+  --warn:#854f0b;--warn-bg:#faeeda;--warn-mid:#ba7517;
+  --blue:#0c447c;--blue-bg:#e6f1fb;--blue-mid:#185fa5;
+  --r:14px;--r-sm:8px;--r-xs:6px;--font:'Sora',system-ui,sans-serif;
+  --max:480px
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#111110;--card:#1c1c1a;--border:rgba(255,255,255,0.09);--text:#efede4;--muted:#8a8a82;
+  --accent:#9fe1cb;--accent-bg:#04342c;--accent-mid:#1d9e75;
+  --danger:#f09595;--danger-bg:#501313;--danger-mid:#e24b4a;
+  --warn:#ef9f27;--warn-bg:#412402;--warn-mid:#ba7517;
+  --blue:#85b7eb;--blue-bg:#042c53;--blue-mid:#185fa5;
+}}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+.app{max-width:var(--max);margin:0 auto;padding-bottom:90px}
+/* Topbar */
+.topbar{padding:16px 18px 0;display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;position:sticky;top:0;background:var(--bg);z-index:50;border-bottom:0.5px solid transparent}
+.topbar-title{font-size:19px;font-weight:700;letter-spacing:-0.4px}
+.topbar-right{display:flex;align-items:center;gap:6px}
+.sync-btn{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:5px 10px;border-radius:20px;border:0.5px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap}
+.sync-btn.connected{border-color:var(--accent-mid);color:var(--accent-mid);background:var(--accent-bg)}
+.sync-btn.syncing{border-color:var(--warn-mid);color:var(--warn-mid);background:var(--warn-bg)}
+.sync-btn.error{border-color:var(--danger-mid);color:var(--danger-mid);background:var(--danger-bg)}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.sync-dot.pulse{animation:pulse 1.5s infinite}
+.topbar-month{font-size:12px;color:var(--muted);padding:5px 10px;border:0.5px solid var(--border);border-radius:20px;background:var(--card);cursor:pointer;font-weight:500}
+/* Nav */
+.nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:var(--max);background:var(--card);border-top:0.5px solid var(--border);display:flex;z-index:100;padding:6px 0 max(12px,env(safe-area-inset-bottom))}
+.nb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;color:var(--muted);font-size:10px;font-weight:600;border:none;background:none;padding:4px 0;letter-spacing:.1px;transition:color .15s}
+.nb.active{color:var(--accent-mid)}.nb.active svg{stroke:var(--accent-mid)}
+/* Screens */
+.screen{display:none;padding:12px 18px}.screen.active{display:block}
+/* Cards */
+.card{background:var(--card);border:0.5px solid var(--border);border-radius:var(--r);padding:16px}
+.card+.card,.card+.section-label{margin-top:12px}
+/* Metrics */
+.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.met{background:var(--card);border:0.5px solid var(--border);border-radius:var(--r-sm);padding:11px 10px}
+.met-lbl{font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.4px;text-transform:uppercase;margin-bottom:4px}
+.met-val{font-size:16px;font-weight:700;letter-spacing:-0.5px}
+.met-val.g{color:var(--accent-mid)}.met-val.r{color:var(--danger-mid)}.met-val.b{color:var(--blue-mid)}
+/* Progress */
+.pbar{height:5px;background:var(--bg);border-radius:3px;overflow:hidden;margin:5px 0}
+.pfill{height:100%;border-radius:3px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+.pfill.ok{background:var(--accent-mid)}.pfill.warn{background:var(--warn-mid)}.pfill.over{background:var(--danger-mid)}
+/* Budget rows */
+.brow{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--border)}
+.brow:last-child{border-bottom:none}
+.brow-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.brow-body{flex:1;min-width:0}
+.brow-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:1px}
+.brow-name{font-size:12px;font-weight:600}
+.brow-sub{font-size:10px;color:var(--muted)}
+.pill{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px}
+.pill.ok{background:var(--accent-bg);color:var(--accent)}.pill.warn{background:var(--warn-bg);color:var(--warn)}.pill.over{background:var(--danger-bg);color:var(--danger)}
+.kw-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
+.kw-chip{font-size:10px;padding:2px 7px;border-radius:10px;background:var(--blue-bg);color:var(--blue-mid);font-weight:600}
+/* Transactions */
+.tx-wrap{position:relative;overflow:hidden;border-bottom:0.5px solid var(--border)}
+.tx-wrap:last-child{border-bottom:none}
+.tx-actions{position:absolute;right:0;top:0;bottom:0;display:flex;align-items:stretch;opacity:0;transform:translateX(100%);transition:transform .22s ease,opacity .22s ease;pointer-events:none}
+.tx-wrap.open .tx-actions{opacity:1;transform:translateX(0);pointer-events:all}
+.tx-wrap.open .tx{transform:translateX(-132px)}
+.tx-btn{width:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;border:none;font-size:10px;font-weight:700}
+.tx-btn.edit{background:var(--blue-bg);color:var(--blue-mid)}.tx-btn.del{background:var(--danger-bg);color:var(--danger-mid)}
+.tx{display:flex;align-items:center;gap:11px;padding:9px 0;cursor:pointer;transition:transform .22s ease;user-select:none}
+.tx-ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.tx-body{flex:1;min-width:0}
+.tx-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx-sub{font-size:11px;color:var(--muted)}
+.tx-amt{font-size:13px;font-weight:700;white-space:nowrap}
+.tx-amt.pos{color:var(--accent-mid)}.tx-amt.neg{color:var(--text)}
+.tx-chevron{color:var(--muted);flex-shrink:0}
+/* Section label */
+.section-label{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin:14px 0 7px;padding:0 2px}
+/* Insights */
+.ins{display:flex;gap:10px;padding:11px 12px;border-radius:var(--r-sm);margin-bottom:9px;border:0.5px solid transparent}
+.ins.info{background:var(--blue-bg);border-color:rgba(24,95,165,.12)}
+.ins.warn{background:var(--warn-bg);border-color:rgba(186,117,23,.15)}
+.ins.good{background:var(--accent-bg);border-color:rgba(29,158,117,.12)}
+.ins-ico{font-size:16px;flex-shrink:0;line-height:1.4}.ins-txt{font-size:12px;line-height:1.55}.ins-txt b{font-weight:700}
+/* Search */
+.srch{position:relative;margin-bottom:12px}
+.srch input{width:100%;padding:9px 12px 9px 34px;border:0.5px solid var(--border);border-radius:var(--r-sm);background:var(--card);color:var(--text);font-size:13px;font-family:var(--font)}
+.srch-ic{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+/* Tags */
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tag{padding:5px 11px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:0.5px solid var(--border);background:var(--card);color:var(--muted);transition:all .15s;white-space:nowrap}
+.tag.on{background:var(--accent-mid);color:#fff;border-color:var(--accent-mid)}
+/* Charts */
+.ch-wrap{position:relative;width:100%;height:180px}.ch-wrap.tall{height:220px}
+.donut-wrap{position:relative;width:150px;height:150px;margin:0 auto 14px}
+.donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+.donut-total{font-size:20px;font-weight:700;letter-spacing:-0.5px}
+.donut-lbl{font-size:10px;color:var(--muted);font-weight:600}
+.leg-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+.leg-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+/* Goals */
+.goal-card{background:var(--card);border:0.5px solid var(--border);border-radius:var(--r);padding:15px;margin-bottom:10px}
+.goal-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:11px}
+.goal-pct{font-size:20px;font-weight:800;color:var(--accent-mid)}
+.goal-ic{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:19px}
+.goal-footer{display:flex;justify-content:space-between;margin-top:9px}
+.goal-stat{font-size:10px;color:var(--muted);line-height:1.7}
+.goal-stat b{display:block;font-size:12px;font-weight:700;color:var(--text)}
+/* Modal */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.ov.open{opacity:1;pointer-events:all}
+.modal{background:var(--card);border-radius:var(--r) var(--r) 0 0;padding:20px;width:100%;max-width:var(--max);transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);max-height:90vh;overflow-y:auto;padding-bottom:max(20px,env(safe-area-inset-bottom))}
+.ov.open .modal{transform:translateY(0)}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:4px;letter-spacing:-.3px}
+.modal-sub{font-size:12px;color:var(--muted);margin-bottom:16px}
+.field{margin-bottom:13px}
+.field label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:600;letter-spacing:.3px;text-transform:uppercase}
+.field input,.field select,.field textarea{width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:var(--r-sm);background:var(--bg);color:var(--text);font-size:14px;font-family:var(--font)}
+.field textarea{resize:none;line-height:1.5;height:58px}
+.field .hint-text{font-size:10px;color:var(--muted);margin-top:4px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btns{display:flex;gap:8px;margin-top:14px}
+.btn-c{flex:1;padding:11px;background:var(--card);color:var(--muted);border:0.5px solid var(--border);border-radius:var(--r-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)}
+.btn-p{flex:2;padding:11px;background:var(--accent-mid);color:#fff;border:none;border-radius:var(--r-sm);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font)}
+.btn-danger{flex:1;padding:11px;background:var(--danger-bg);color:var(--danger-mid);border:0.5px solid var(--danger-mid);border-radius:var(--r-sm);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font)}
+.btn-lhv{width:100%;padding:12px;background:#00a3e0;color:#fff;border:none;border-radius:var(--r-sm);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);margin-bottom:8px}
+.btn-google{width:100%;padding:12px 16px;background:#fff;color:#3c4043;border:1px solid #dadce0;border-radius:var(--r-sm);font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:12px;transition:box-shadow .15s}
+.btn-google:hover{box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.btn-outline-danger{width:100%;padding:11px;background:transparent;color:var(--danger-mid);border:0.5px solid var(--danger-mid);border-radius:var(--r-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font);margin-top:8px}
+/* FAB */
+.fab{position:fixed;bottom:max(74px, calc(60px + env(safe-area-inset-bottom)));right:max(20px,calc(50vw - var(--max)/2 + 20px));width:46px;height:46px;background:var(--accent-mid);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:99;box-shadow:0 3px 14px rgba(29,158,117,.4)}
+/* Import */
+.import-zone{border:1.5px dashed var(--border);border-radius:var(--r-sm);padding:20px;text-align:center;cursor:pointer;transition:border-color .15s;margin-bottom:12px}
+.import-zone:hover{border-color:var(--accent-mid)}
+/* Alerts */
+.alert-banner{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--warn-bg);border:0.5px solid var(--warn-mid);border-radius:var(--r-sm);margin-bottom:8px;font-size:12px;font-weight:600;color:var(--warn)}
+.alert-banner.danger{background:var(--danger-bg);border-color:var(--danger-mid);color:var(--danger)}
+.alert-banner.lhv{background:#e6f7ff;border-color:#00a3e0;color:#006fa8}
+.alert-banner.success{background:var(--accent-bg);border-color:var(--accent-mid);color:var(--accent)}
+/* Tx list header */
+.tx-list-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.edit-toggle{font-size:11px;font-weight:700;color:var(--blue-mid);cursor:pointer;padding:4px 10px;border:0.5px solid var(--blue-mid);border-radius:20px;background:var(--blue-bg)}
+.edit-toggle.active{background:var(--danger-bg);color:var(--danger-mid);border-color:var(--danger-mid)}
+.bulk-bar{display:none;background:var(--danger-bg);border:0.5px solid var(--danger-mid);border-radius:var(--r-sm);padding:10px 14px;margin-bottom:10px;align-items:center;justify-content:space-between}
+.bulk-bar.show{display:flex}
+.bulk-bar span{font-size:12px;font-weight:700;color:var(--danger)}
+.bulk-bar button{font-size:12px;font-weight:700;padding:6px 14px;background:var(--danger-mid);color:#fff;border:none;border-radius:var(--r-xs);cursor:pointer;font-family:var(--font)}
+.tx-check{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--border);background:var(--card);flex-shrink:0;display:none;align-items:center;justify-content:center;cursor:pointer;transition:all .15s}
+.tx-check.show{display:flex}.tx-check.checked{background:var(--danger-mid);border-color:var(--danger-mid)}
+.hint{font-size:11px;color:var(--muted);text-align:center;padding:8px 0 2px;display:flex;align-items:center;justify-content:center;gap:5px}
+.del-confirm{background:var(--danger-bg);border:0.5px solid var(--danger-mid);border-radius:var(--r-sm);padding:14px;margin-bottom:14px;text-align:center}
+.del-confirm p{font-size:13px;color:var(--danger);font-weight:600;margin-bottom:4px}
+.del-confirm span{font-size:12px;color:var(--muted)}
+/* Month tabs */
+.month-tabs{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+.month-tab{padding:5px 14px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:0.5px solid var(--border);background:var(--card);color:var(--muted);white-space:nowrap;flex-shrink:0}
+.month-tab.on{background:var(--accent-mid);color:#fff;border-color:var(--accent-mid)}
+/* Category manager */
+.cat-manage-row{display:flex;align-items:flex-start;gap:8px;padding:11px 0;border-bottom:0.5px solid var(--border)}
+.cat-manage-row:last-child{border-bottom:none}
+.cat-swatch{width:30px;height:30px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;border:1.5px solid transparent;transition:transform .15s;margin-top:1px}
+.cat-swatch:hover{transform:scale(1.1)}
+.cat-fields{flex:1;min-width:0}
+.cat-name-inp{width:100%;background:transparent;border:none;border-bottom:1px solid transparent;font-size:13px;font-weight:600;color:var(--text);font-family:var(--font);padding:0 0 2px;outline:none;transition:border-color .15s}
+.cat-name-inp:focus{border-bottom-color:var(--accent-mid)}
+.cat-desc-inp{width:100%;background:transparent;border:none;font-size:11px;color:var(--muted);font-family:var(--font);padding:2px 0 0;outline:none;margin-top:2px;resize:none;height:auto;line-height:1.4}
+.cat-desc-inp::placeholder{color:var(--border);font-style:italic}
+.cat-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.cat-budget-inp{width:72px;padding:4px 8px;border:0.5px solid var(--border);border-radius:var(--r-xs);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--font);text-align:right}
+.cat-del-btn{width:22px;height:22px;border-radius:6px;border:none;background:var(--danger-bg);color:var(--danger-mid);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center}
+.cat-del-btn:hover{background:var(--danger-mid);color:#fff}
+.cat-tx-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:8px;background:var(--blue-bg);color:var(--blue-mid);white-space:nowrap}
+.color-picker-row{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 14px}
+.color-dot{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .15s}
+.color-dot:hover{transform:scale(1.15)}.color-dot.selected{border-color:var(--text);transform:scale(1.1)}
+.emoji-picker-row{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 14px}
+.ep-btn{width:32px;height:32px;border-radius:8px;border:0.5px solid var(--border);background:var(--card);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.ep-btn:hover,.ep-btn.selected{background:var(--accent-bg);border-color:var(--accent-mid)}
+.reassign-box{background:var(--warn-bg);border:0.5px solid var(--warn-mid);border-radius:var(--r-sm);padding:12px;margin-bottom:12px}
+.reassign-box p{font-size:12px;font-weight:700;color:var(--warn);margin-bottom:8px}
+.reassign-box select{width:100%;padding:8px 10px;border:0.5px solid var(--warn-mid);border-radius:var(--r-xs);background:var(--bg);color:var(--text);font-size:13px;font-family:var(--font)}
+/* Drive status */
+.drive-status-card{background:var(--card);border:0.5px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:12px;text-align:center}
+.drive-info-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:0.5px solid var(--border);font-size:13px}
+.drive-info-row:last-child{border-bottom:none}
+.drive-info-val{font-weight:600;font-size:12px}
+/* Setup screen */
+.setup-screen{min-height:60vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px 24px}
+.setup-icon{font-size:52px;margin-bottom:16px}
+.setup-title{font-size:22px;font-weight:800;letter-spacing:-.5px;margin-bottom:8px}
+.setup-sub{font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:28px}
+.setup-steps{text-align:left;background:var(--card);border:0.5px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:20px;width:100%}
+.setup-step{display:flex;gap:12px;padding:8px 0;border-bottom:0.5px solid var(--border);font-size:13px}
+.setup-step:last-child{border-bottom:none}
+.setup-step-num{width:22px;height:22px;border-radius:50%;background:var(--accent-mid);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.setup-step-txt{color:var(--muted);line-height:1.5}
+.setup-step-txt b{color:var(--text);font-weight:600}
+code{font-family:monospace;background:var(--bg);padding:2px 6px;border-radius:4px;font-size:12px;border:0.5px solid var(--border)}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="app">
+  <div class="topbar">
+    <div class="topbar-title" id="scr-title">Ülevaade</div>
+    <div class="topbar-right">
+      <div class="sync-btn" id="sync-btn" onclick="handleSyncClick()">
+        <div class="sync-dot" id="sync-dot"></div>
+        <span id="sync-label">Ühenda</span>
+      </div>
+      <div class="topbar-month" id="month-display">— ▾</div>
+    </div>
+  </div>
+
+  <!-- ÜLEVAADE -->
+  <div class="screen active" id="scr-dashboard">
+    <div id="lhv-banner"></div>
+    <div class="metrics" id="met-row"></div>
+    <div id="alert-banners"></div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px">
+        <span style="font-size:13px;font-weight:700">Eelarve seis</span>
+        <span style="font-size:11px;color:var(--muted)" id="day-counter">—</span>
+      </div>
+      <div id="dash-budgets"></div>
+    </div>
+    <div class="section-label">Kulutuste jaotus</div>
+    <div class="card">
+      <div class="donut-wrap">
+        <canvas id="donut" width="150" height="150"></canvas>
+        <div class="donut-center"><div class="donut-total" id="dn-total">€0</div><div class="donut-lbl">kokku kulutatud</div></div>
+      </div>
+      <div class="leg-grid" id="dn-leg"></div>
+    </div>
+    <div class="section-label">Tähelepanekud</div>
+    <div id="insights"></div>
+    <div class="section-label">Viimased tehingud</div>
+    <div class="card" id="dash-recent"></div>
+  </div>
+
+  <!-- TEHINGUD -->
+  <div class="screen" id="scr-transactions">
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="btn-c" style="flex:1;font-size:12px;padding:9px" onclick="openModal('import')">⬆ Impordi</button>
+      <button class="btn-p" style="flex:1;font-size:12px;margin-top:0;padding:9px" onclick="openModal('tx',null)">+ Lisa käsitsi</button>
+    </div>
+    <div class="month-tabs" id="month-tabs"></div>
+    <div class="srch">
+      <span class="srch-ic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></span>
+      <input type="text" placeholder="Otsi tehinguid…" id="tx-srch" oninput="renderTx()">
+    </div>
+    <div class="tags" id="tx-tags"></div>
+    <div class="tx-list-header">
+      <span style="font-size:12px;color:var(--muted);font-weight:600" id="tx-count"></span>
+      <div class="edit-toggle" id="edit-toggle" onclick="toggleEditMode()">✏️ Muuda</div>
+    </div>
+    <div class="bulk-bar" id="bulk-bar">
+      <span id="bulk-label">0 valitud</span>
+      <button onclick="bulkDelete()">Kustuta valitud</button>
+    </div>
+    <div class="hint" id="swipe-hint">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      Vajuta tehingule muutmiseks / kustutamiseks
+    </div>
+    <div class="card" style="padding:0 16px" id="tx-list"></div>
+  </div>
+
+  <!-- EELARVE -->
+  <div class="screen" id="scr-budgets">
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:11px" id="bud-title">Eelarve kokkuvõte</div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--muted)">Kogu eelarve</span><span id="bud-total" style="font-weight:700"></span></div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--muted)">Kulutatud</span><span id="bud-spent" style="font-weight:700;color:var(--danger-mid)"></span></div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;padding:5px 0"><span style="color:var(--muted)">Alles</span><span id="bud-rem" style="font-weight:700;color:var(--accent-mid)"></span></div>
+    </div>
+    <div class="card" id="bud-list"></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn-c" onclick="openModal('categories')" style="flex:1">⚙️ Halda kategooriaid</button>
+      <button class="btn-p" onclick="openModal('budget')" style="flex:1">Muuda eelarvet</button>
+    </div>
+  </div>
+
+  <!-- ANALÜÜS -->
+  <div class="screen" id="scr-analysis">
+    <div class="tags">
+      <div class="tag on" onclick="setATab('breakdown',this)">Jaotus</div>
+      <div class="tag" onclick="setATab('trends',this)">Trend</div>
+      <div class="tag" onclick="setATab('compare',this)">Kuude võrdlus</div>
+    </div>
+    <div id="a-breakdown">
+      <div class="card"><div style="font-size:13px;font-weight:700;margin-bottom:11px" id="a-title">Kulutused</div><div class="ch-wrap"><canvas id="barC"></canvas></div></div>
+      <div class="card" style="margin-top:12px" id="a-cat-list"></div>
+    </div>
+    <div id="a-trends" style="display:none">
+      <div class="card"><div style="font-size:13px;font-weight:700;margin-bottom:11px">Igakuised kulutused</div><div class="ch-wrap tall"><canvas id="trendC"></canvas></div></div>
+      <div class="card" style="margin-top:12px" id="mom-list"></div>
+    </div>
+    <div id="a-compare" style="display:none">
+      <div class="card"><div style="font-size:13px;font-weight:700;margin-bottom:11px" id="cmp-title">Kuude võrdlus</div><div class="ch-wrap tall"><canvas id="cmpC"></canvas></div></div>
+    </div>
+  </div>
+
+  <!-- EESMÄRGID -->
+  <div class="screen" id="scr-goals">
+    <div id="goals-list"></div>
+    <button class="btn-p" style="width:100%;padding:12px;margin-top:4px" onclick="openModal('goal')">+ Uus eesmärk</button>
+  </div>
+</div>
+
+<!-- FAB -->
+<div class="fab" onclick="openModal('tx',null)">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.8"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+</div>
+
+<!-- Navigatsioon -->
+<nav class="nav">
+  <button class="nb active" onclick="gotoScreen('dashboard',this)">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+    Ülevaade
+  </button>
+  <button class="nb" onclick="gotoScreen('transactions',this)">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h11"/></svg>
+    Tehingud
+  </button>
+  <button class="nb" onclick="gotoScreen('budgets',this)">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h7"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+    Eelarve
+  </button>
+  <button class="nb" onclick="gotoScreen('analysis',this)">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Analüüs
+  </button>
+  <button class="nb" onclick="gotoScreen('goals',this)">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+    Eesmärgid
+  </button>
+</nav>
+
+<!-- Modaal -->
+<div class="ov" id="ov" onclick="ovClick(event)"><div class="modal" id="modal"></div></div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script>
+// ═══════════════════════════════════════════════════════════════
+// KONFIGURATSIOON — muuda CLIENT_ID vajadusel
+// ═══════════════════════════════════════════════════════════════
+const CLIENT_ID = '498478650891-2og8nmmis8k2632upbp8p9jl3b8skadv.apps.googleusercontent.com';
+const SCOPES    = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
+const FILE_NAME = 'finance-app-data-v2.json';
+
+// ═══════════════════════════════════════════════════════════════
+// GOOGLE DRIVE SÜNKROONIMINE
+// ═══════════════════════════════════════════════════════════════
+let driveState = { connected:false, token:null, email:null, name:null, fileId:null, lastSync:null, busy:false };
+let saveTimer = null;
+
+function setSyncUI(state, label) {
+  const btn=document.getElementById('sync-btn'), dot=document.getElementById('sync-dot'), lbl=document.getElementById('sync-label');
+  btn.className='sync-btn'; dot.className='sync-dot';
+  if (state==='connected') { btn.classList.add('connected'); }
+  else if (state==='syncing') { btn.classList.add('syncing'); dot.classList.add('pulse'); }
+  else if (state==='error') { btn.classList.add('error'); }
+  lbl.textContent = label||'Ühenda';
+}
+
+async function connectDrive() {
+  setSyncUI('syncing','Ühendun…');
+  try {
+    await new Promise((resolve, reject) => {
+      // Poll for google to load
+      let attempts = 0;
+      const check = () => {
+        if (window.google && window.google.accounts) { resolve(); return; }
+        if (++attempts > 30) { reject(new Error('Google API ei laadunud')); return; }
+        setTimeout(check, 300);
+      };
+      check();
+    });
+    await new Promise((resolve, reject) => {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: async (resp) => {
+          if (resp.error) { reject(new Error(resp.error)); return; }
+          driveState.token = resp.access_token;
+          try {
+            const ui = await fetch('https://www.googleapis.com/oauth2/v3/userinfo',
+              { headers:{ Authorization:'Bearer '+resp.access_token } }).then(r=>r.json());
+            driveState.name  = ui.name  || ui.email;
+            driveState.email = ui.email || '';
+          } catch(e){}
+          driveState.connected = true;
+          resolve();
+        }
+      });
+      client.requestAccessToken({ prompt:'' });
+    });
+    await loadFromDrive();
+    const shortName = driveState.email ? driveState.email.split('@')[0] : 'Drive';
+    setSyncUI('connected', shortName);
+    showBanner('success','☁️ Google Drive ühendatud!', 3000);
+  } catch(e) {
+    console.error(e);
+    setSyncUI('error','Viga');
+    showBanner('danger','Ühendus ebaõnnestus: '+e.message, 5000);
+    setTimeout(()=>setSyncUI('','Ühenda'), 4000);
+  }
+}
+
+function handleSyncClick() {
+  if (driveState.connected) openModal('driveSettings');
+  else connectDrive();
+}
+
+async function driveReq(url, opts={}) {
+  const r = await fetch(url, { ...opts, headers:{ Authorization:'Bearer '+driveState.token, ...(opts.headers||{}) } });
+  if (r.status===401) { driveState.connected=false; setSyncUI('','Ühenda'); throw new Error('Token aegunud — ühenda uuesti'); }
+  return r;
+}
+
+async function findOrCreate() {
+  if (driveState.fileId) return driveState.fileId;
+  const res = await driveReq(
+    `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D'${FILE_NAME}'&fields=files(id)`
+  ).then(r=>r.json());
+  if (res.files && res.files.length) { driveState.fileId=res.files[0].id; return driveState.fileId; }
+  const meta = await driveReq('https://www.googleapis.com/drive/v3/files',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ name:FILE_NAME, parents:['appDataFolder'] })
+  }).then(r=>r.json());
+  driveState.fileId=meta.id; return driveState.fileId;
+}
+
+async function saveToDrive() {
+  if (!driveState.connected || driveState.busy) return;
+  driveState.busy=true;
+  setSyncUI('syncing','Salvestab…');
+  try {
+    const id = await findOrCreate();
+    const body = JSON.stringify(getAppState());
+    await driveReq(
+      `https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`,
+      { method:'PATCH', headers:{'Content-Type':'application/json'}, body }
+    );
+    driveState.lastSync = new Date();
+    const shortName = driveState.email ? driveState.email.split('@')[0] : 'Drive';
+    setSyncUI('connected', shortName);
+  } catch(e) {
+    console.error('Save failed:', e);
+    setSyncUI('error','Viga');
+    setTimeout(()=>{ if(driveState.connected) setSyncUI('connected', driveState.email?.split('@')[0]||'Drive'); }, 3000);
+  }
+  driveState.busy=false;
+}
+
+async function loadFromDrive() {
+  const id = await findOrCreate();
+  try {
+    const r = await driveReq(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`);
+    if (!r.ok) return;
+    const txt = await r.text();
+    if (!txt || txt.trim()==='') return;
+    const data = JSON.parse(txt);
+    restoreAppState(data);
+    driveState.lastSync=new Date();
+  } catch(e) { console.log('Load:', e.message); }
+}
+
+function scheduleSave() {
+  if (!driveState.connected) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveToDrive, 2000);
+}
+
+function getAppState() {
+  return { version:3, savedAt:new Date().toISOString(), categories, txs, goals };
+}
+
+function restoreAppState(data) {
+  if (!data || data.version < 2) return;
+  if (Array.isArray(data.categories) && data.categories.length) categories=data.categories;
+  if (Array.isArray(data.txs)) txs=data.txs;
+  if (Array.isArray(data.goals)) goals=data.goals;
+  const months=getAvailableMonths();
+  if (months.length) activeMonth=months[0];
+  refreshAll();
+  renderGoals();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ANDMED
+// ═══════════════════════════════════════════════════════════════
+const PALETTE=['#1d9e75','#ba7517','#185fa5','#d85a30','#d4537e','#534ab7','#3b6d11','#e24b4a','#888780','#9f4fbf','#c47900','#0891b2','#be123c','#15803d','#b45309'];
+const EMOJI_LIST=['🍽️','🚌','🏠','💪','🎬','👶','💰','✈️','🐾','🎓','🛍️','🎮','💊','🏋️','🎵','🏖️','🚗','📱','💡','🍕','🎁','🏥','📚','🐶','🌿'];
+const MONTHS_ET=['jaan','veebr','märts','apr','mai','juuni','juuli','aug','sept','okt','nov','dets'];
+const MONTHS_FULL=['Jaanuar','Veebruar','Märts','Aprill','Mai','Juuni','Juuli','August','September','Oktoober','November','Detsember'];
+
+let categories = [
+  {id:'c1',name:'Toit ja söömine',   emoji:'🍽️',color:'#1d9e75',budget:400,desc:'selver, rimi, lidl, prisma, maxima, coop, restoran, kohvik, toidupood, konsum, kaasiku'},
+  {id:'c2',name:'Transport',          emoji:'🚌',color:'#ba7517',budget:120,desc:'bolt, buss, tankla, kütus, lux express, pilet, ühistransport, takso'},
+  {id:'c3',name:'Eluase ja arved',    emoji:'🏠',color:'#185fa5',budget:900,desc:'üür, rent, elekter, gaas, vesi, prügi, internet, telefon, elisa, telia, eesti energia, keskkonnateenused, kindlustus, kodulaen, liising'},
+  {id:'c4',name:'Tervis ja sport',    emoji:'💪',color:'#d85a30',budget:80, desc:'apteek, arst, haigla, spordiklubi, jõusaal, fitness, g4s, 24-7, lensor, prillid'},
+  {id:'c5',name:'Meelelahutus',       emoji:'🎬',color:'#d4537e',budget:60, desc:'netflix, spotify, kino, teater, vanemuine, kontsert, mäng, apollo, ohoo'},
+  {id:'c6',name:'Lapsed',             emoji:'👶',color:'#534ab7',budget:150,desc:'lasteaed, kool, taskuraha, viiul, trenn, mänguasi, ekskursioon, õpik'},
+  {id:'c7',name:'Säästud ja investeeringud',emoji:'💰',color:'#3b6d11',budget:200,desc:'mikroinvesteering, kasvukonto, pension, pensionikeskus, investeering, fond'},
+];
+let txs=[], goals=[
+  {id:1,name:'Laste hariduse fond',icon:'🎓',color:'#534ab7',target:10000,saved:3200,monthly:200},
+  {id:2,name:'Hädaabifondi reserv', icon:'🛡️',color:'#185fa5',target:6000, saved:2800,monthly:300},
+  {id:3,name:'Perepuhkus',          icon:'✈️',color:'#1d9e75',target:1500, saved:420, monthly:200},
+];
+
+let txCatFilter='all', donutCh, barCh, trendCh, cmpCh;
+let editMode=false, selectedIds=new Set(), openTxId=null;
+let activeMonth=null, parsedImport=[];
+let newCatColor=PALETTE[0], newCatEmoji='📦';
+
+const fmt  = v => '€'+Math.abs(v).toLocaleString('et-EE',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtD = d => { const dt=new Date(d); return dt.getDate()+'. '+MONTHS_ET[dt.getMonth()]; };
+const getCatByName = n => categories.find(c=>c.name===n)||{emoji:'📦',color:'#888780',desc:''};
+const getCatById   = id => categories.find(c=>c.id===id);
+
+// ═══════════════════════════════════════════════════════════════
+// KATEGORISEERIMINE
+// ═══════════════════════════════════════════════════════════════
+function matchByDesc(text) {
+  const t=text.toLowerCase();
+  for (const c of categories) {
+    if (!c.desc) continue;
+    const kws=c.desc.split(',').map(k=>k.trim().toLowerCase()).filter(k=>k.length>2);
+    for (const kw of kws) { if (t.includes(kw)) return c.name; }
+  }
+  return null;
+}
+
+function autoCatDynamic(name, selgitus) {
+  const n=(name+' '+selgitus).toLowerCase();
+  const byDesc=matchByDesc(n); if (byDesc) return byDesc;
+  if (/selver|rimi|lidl|maxima|coop|prisma|konsum|maksimarket|suurejoe|ulejoe|kaasiku|hinnapomm|snabb/.test(n)) return findCatByKw('toit')||'Muu';
+  if (/tankla|bolt|ühistransport|lux express/.test(n)) return findCatByKw('transport')||'Muu';
+  if (/liising|kodulaen|eesti energia|kasvukonto haldustasu|keskkonnateenused/.test(n)) return findCatByKw('eluase')||'Muu';
+  if (/apteek|arst|spordiklubi|g4s|24-7|lensor/.test(n)) return findCatByKw('tervis')||'Muu';
+  if (/netflix|spotify|kino|teater|vanemuine|ohoo|forendum|apollo kauplused/.test(n)) return findCatByKw('meelelahutus')||'Muu';
+  if (/taskuraha|säde|kõue|hõbe|viiul|kool|lasteaed/.test(n)) return findCatByKw('lapsed')||'Muu';
+  if (/mikroinvesteering|kasvukontole|investeering|pension|pensionikeskus/.test(n)) return findCatByKw('säästud')||'Muu';
+  return 'Muu';
+}
+
+function findCatByKw(kw) {
+  const c=categories.find(c=>c.name.toLowerCase().includes(kw)||(c.desc||'').toLowerCase().includes(kw));
+  return c?c.name:null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LHV PARSER
+// ═══════════════════════════════════════════════════════════════
+function parseLHV(text) {
+  text=text.replace(/^\uFEFF/,'');
+  const lines=text.split('\n').map(l=>l.trim()).filter(l=>l.length>0);
+  if (lines.length<2) return [];
+  const header=parseTSVLine(lines[0]);
+  const idx={}; header.forEach((h,i)=>{idx[h.trim()]=i;});
+  const colDate=idx['Kuupäev'],colName=idx['Saaja/maksja nimi'],colDC=idx['Deebet/Kreedit (D/C)'],colAmt=idx['Summa'],colDesc=idx['Selgitus'];
+  const result=[];
+  for (let i=1;i<lines.length;i++) {
+    const cols=parseTSVLine(lines[i]);
+    if (cols.length<6) continue;
+    const dateStr=(cols[colDate]||'').trim();
+    if (!dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) continue;
+    const rawName=(cols[colName]||'').trim(), selgitus=(cols[colDesc]||'').trim();
+    const displayName=rawName||selgitusToName(selgitus);
+    if (!displayName) continue;
+    const dc=(cols[colDC]||'').trim();
+    const amtStr=(cols[colAmt]||'').replace(/\s/g,'').replace(',','.');
+    const amt=parseFloat(amtStr);
+    if (isNaN(amt)) continue;
+    const finalAmt=dc==='C'?Math.abs(amt):-Math.abs(amt);
+    const cat=finalAmt>0?'Tulu':autoCatDynamic(displayName,selgitus);
+    result.push({id:Date.now()+Math.random(), name:cleanName(displayName), cat, amt:finalAmt, date:dateStr, source:'lhv'});
+  }
+  return result;
+}
+
+function parseTSVLine(line) {
+  const result=[]; let cur='',inQ=false;
+  for (let i=0;i<line.length;i++) {
+    const c=line[i];
+    if (c==='"') inQ=!inQ;
+    else if (c==='\t'&&!inQ) { result.push(cur); cur=''; }
+    else cur+=c;
+  }
+  result.push(cur); return result;
+}
+
+function selgitusToName(s) {
+  if (!s) return '';
+  const m=s.match(/\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+(.+?)(?:\\|$)/);
+  if (m) return m[1].trim();
+  return s.substring(0,40).trim();
+}
+
+function cleanName(n) {
+  n=n.trim();
+  if (n===n.toUpperCase()&&n.length>3) {
+    n=n.charAt(0).toUpperCase()+n.slice(1).toLowerCase();
+    n=n.replace(/\blidl\b/gi,'Lidl').replace(/\brimi\b/gi,'Rimi')
+       .replace(/\bselver\b/gi,'Selver').replace(/\bprisma\b/gi,'Prisma')
+       .replace(/\bmaxima\b/gi,'Maxima').replace(/\bcoop\b/gi,'Coop')
+       .replace(/\bpaypal\b/gi,'PayPal').replace(/\bnetflix\b/gi,'Netflix');
+  }
+  return n;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KUUD
+// ═══════════════════════════════════════════════════════════════
+function getAvailableMonths() {
+  const s=new Set();
+  txs.forEach(t=>{ const d=new Date(t.date); s.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); });
+  return Array.from(s).sort().reverse();
+}
+function getTxsForMonth(m) { return m?txs.filter(t=>t.date.startsWith(m)):txs; }
+function monthLabel(ym) { const[y,m]=ym.split('-'); return MONTHS_FULL[parseInt(m)-1]+' '+y; }
+
+function setMonth(m,el) {
+  activeMonth=m;
+  document.querySelectorAll('.month-tab').forEach(t=>t.classList.remove('on'));
+  if(el)el.classList.add('on');
+  updateMonthDisplay(); renderTx(); renderDash(); renderBudget();
+}
+
+function updateMonthDisplay() {
+  if (!activeMonth) return;
+  const[y,mo]=activeMonth.split('-');
+  document.getElementById('month-display').textContent=MONTHS_FULL[parseInt(mo)-1]+' '+y+' ▾';
+  const days=new Date(parseInt(y),parseInt(mo),0).getDate();
+  const today=new Date(), isCur=today.getFullYear()===parseInt(y)&&today.getMonth()+1===parseInt(mo);
+  document.getElementById('day-counter').textContent=(isCur?today.getDate():days)+'. päev / '+days;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PÕHILOOGIKA
+// ═══════════════════════════════════════════════════════════════
+function recalcBudgetSpent() {
+  categories.forEach(c=>{c.spent=0;});
+  getTxsForMonth(activeMonth).forEach(t=>{
+    if(t.amt<0){ const c=categories.find(c=>c.name===t.cat); if(c)c.spent=(c.spent||0)+Math.abs(t.amt); }
+  });
+}
+
+function refreshAll() { recalcBudgetSpent(); renderTxFilterTags(); renderTx(); renderDash(); renderBudget(); }
+
+function gotoScreen(id,btn) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
+  document.getElementById('scr-'+id).classList.add('active');
+  if(btn)btn.classList.add('active');
+  const titles={dashboard:'Ülevaade',transactions:'Tehingud',budgets:'Eelarve',analysis:'Analüüs',goals:'Eesmärgid'};
+  document.getElementById('scr-title').textContent=titles[id]||'';
+  if(id==='analysis')setTimeout(buildCharts,80);
+  if(id==='dashboard')buildDonut();
+}
+
+function renderTxFilterTags() {
+  const cur=txCatFilter;
+  document.getElementById('tx-tags').innerHTML=
+    `<div class="tag${cur==='all'?' on':''}" onclick="setTxCat('all',this)">Kõik</div>`+
+    categories.map(c=>`<div class="tag${cur===c.name?' on':''}" onclick="setTxCatN(this,'${c.name.replace(/'/g,"\\'")}'">${c.emoji} ${c.name.split(' ')[0]}</div>`).join('');
+}
+function setTxCat(c,el){txCatFilter=c;document.querySelectorAll('#tx-tags .tag').forEach(t=>t.classList.remove('on'));el.classList.add('on');renderTx();}
+function setTxCatN(el,n){txCatFilter=n;document.querySelectorAll('#tx-tags .tag').forEach(t=>t.classList.remove('on'));el.classList.add('on');renderTx();}
+
+function toggleEditMode() {
+  editMode=!editMode; selectedIds.clear(); openTxId=null;
+  const tog=document.getElementById('edit-toggle');
+  tog.textContent=editMode?'✓ Valmis':'✏️ Muuda'; tog.classList.toggle('active',editMode);
+  document.getElementById('swipe-hint').style.display=editMode?'none':'flex';
+  renderTx();
+}
+function toggleSelect(id){if(selectedIds.has(id))selectedIds.delete(id);else selectedIds.add(id);updateBulkBar();renderTx();}
+function updateBulkBar(){const bar=document.getElementById('bulk-bar'),n=selectedIds.size;if(n>0){bar.classList.add('show');document.getElementById('bulk-label').textContent=n+' valitud';}else bar.classList.remove('show');}
+function bulkDelete(){txs=txs.filter(t=>!selectedIds.has(t.id));selectedIds.clear();editMode=false;document.getElementById('edit-toggle').textContent='✏️ Muuda';document.getElementById('edit-toggle').classList.remove('active');document.getElementById('bulk-bar').classList.remove('show');document.getElementById('swipe-hint').style.display='flex';refreshAll();scheduleSave();}
+function openTxActions(id){if(editMode)return;openTxId=openTxId===id?null:id;renderTx();}
+
+function renderMonthTabs() {
+  const months=getAvailableMonths();
+  if(!months.length){document.getElementById('month-tabs').innerHTML='';return;}
+  if(!activeMonth)activeMonth=months[0];
+  document.getElementById('month-tabs').innerHTML=months.map(m=>`<div class="month-tab${activeMonth===m?' on':''}" onclick="setMonth('${m}',this)">${monthLabel(m)}</div>`).join('');
+  updateMonthDisplay();
+}
+
+function renderTx() {
+  renderMonthTabs();
+  const q=(document.getElementById('tx-srch').value||'').toLowerCase();
+  let list=getTxsForMonth(activeMonth).filter(t=>{
+    return (txCatFilter==='all'||t.cat===txCatFilter)&&(!q||t.name.toLowerCase().includes(q)||t.cat.toLowerCase().includes(q));
+  });
+  document.getElementById('tx-count').textContent=list.length+' tehing'+(list.length===1?'':'ut');
+  const el=document.getElementById('tx-list');
+  if(!list.length){el.innerHTML='<div style="text-align:center;color:var(--muted);padding:24px;font-size:13px">Tehinguid ei leitud</div>';return;}
+  el.innerHTML=list.map(t=>{
+    const isOpen=openTxId===t.id,isSel=selectedIds.has(t.id),cd=getCatByName(t.cat);
+    const srcBadge=t.source==='lhv'?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:#e6f7ff;color:#006fa8;font-weight:700;margin-left:4px">LHV</span>':'';
+    return `<div class="tx-wrap${isOpen?' open':''}" id="tw-${t.id}">
+      <div class="tx" onclick="${editMode?`toggleSelect(${t.id})`:`openTxActions(${t.id})`}">
+        <div class="tx-check${editMode?' show':''}${isSel?' checked':''}" onclick="event.stopPropagation();toggleSelect(${t.id})">${isSel?`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`:''}</div>
+        <div class="tx-ic" style="background:${cd.color}20">${cd.emoji}</div>
+        <div class="tx-body"><div class="tx-name">${t.name}${srcBadge}</div><div class="tx-sub">${t.cat} · ${fmtD(t.date)}</div></div>
+        <div class="tx-amt ${t.amt>0?'pos':'neg'}">${t.amt>0?'+':'-'}${fmt(t.amt)}</div>
+        ${!editMode?`<div class="tx-chevron"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></div>`:''}
+      </div>
+      <div class="tx-actions">
+        <button class="tx-btn edit" onclick="event.stopPropagation();openModal('tx',${t.id})"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Muuda</button>
+        <button class="tx-btn del" onclick="event.stopPropagation();confirmDelete(${t.id})"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>Kustuta</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function confirmDelete(id){const t=txs.find(x=>x.id===id);if(!t)return;openTxId=null;const ov=document.getElementById('ov'),m=document.getElementById('modal');m.innerHTML=`<div class="modal-title">Kustuta tehing</div><div class="modal-sub">Seda toimingut ei saa tagasi võtta.</div><div class="del-confirm"><p>${t.name}</p><span>${t.cat} · ${fmtD(t.date)} · ${t.amt>0?'+':'-'}${fmt(t.amt)}</span></div><div class="btns"><button class="btn-c" onclick="closeModal()">Tühista</button><button class="btn-danger" onclick="deleteTx(${id})">Kustuta</button></div>`;ov.classList.add('open');}
+function deleteTx(id){txs=txs.filter(t=>t.id!==id);closeModal();renderTx();renderDash();renderBudget();scheduleSave();}
+
+function renderDash() {
+  recalcBudgetSpent();
+  const filtered=getTxsForMonth(activeMonth);
+  const income=filtered.filter(t=>t.amt>0).reduce((s,t)=>s+t.amt,0);
+  const spent=filtered.filter(t=>t.amt<0).reduce((s,t)=>s+Math.abs(t.amt),0);
+  document.getElementById('met-row').innerHTML=`
+    <div class="met"><div class="met-lbl">Saldo</div><div class="met-val b">${fmt(income-spent)}</div></div>
+    <div class="met"><div class="met-lbl">Tulud</div><div class="met-val g">${fmt(income)}</div></div>
+    <div class="met"><div class="met-lbl">Kulud</div><div class="met-val r">${fmt(spent)}</div></div>`;
+  const alerts=[];
+  categories.forEach(c=>{const p=c.budget>0?((c.spent||0)/c.budget)*100:0;if(p>=100)alerts.push({type:'danger',msg:`<b>${c.name}</b> eelarve ületatud ${fmt((c.spent||0)-c.budget)} võrra`});else if(p>=80)alerts.push({type:'warn',msg:`<b>${c.name}</b> on ${Math.round(p)}% — alles ${fmt(c.budget-(c.spent||0))}`});});
+  document.getElementById('alert-banners').innerHTML=alerts.slice(0,2).map(a=>`<div class="alert-banner ${a.type}" style="margin-bottom:8px">⚠️ ${a.msg}</div>`).join('');
+  document.getElementById('dash-budgets').innerHTML=categories.map(c=>{
+    const s=c.spent||0,p=c.budget>0?Math.min(100,Math.round((s/c.budget)*100)):0,cls=p>=100?'over':p>=80?'warn':'ok';
+    return `<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:1px">
+        <span style="font-size:11px;font-weight:600;color:var(--muted)">${c.emoji} ${c.name}</span>
+        <span style="font-size:11px;font-weight:700;color:${cls==='over'?'var(--danger-mid)':cls==='warn'?'var(--warn-mid)':'var(--text)'}">${fmt(s)} / ${fmt(c.budget)}</span>
+      </div>
+      ${c.desc?`<div style="font-size:10px;color:var(--muted);margin-bottom:2px;opacity:.7">${c.desc.split(',').slice(0,4).map(k=>k.trim()).join(', ')}${c.desc.split(',').length>4?'…':''}</div>`:''}
+      <div class="pbar"><div class="pfill ${cls}" style="width:${p}%"></div></div>
+    </div>`;
+  }).join('');
+  document.getElementById('dash-recent').innerHTML=filtered.slice(0,6).map(t=>{const cd=getCatByName(t.cat);return `<div class="tx" style="cursor:default"><div class="tx-ic" style="background:${cd.color}20">${cd.emoji}</div><div class="tx-body"><div class="tx-name">${t.name}</div><div class="tx-sub">${fmtD(t.date)}</div></div><div class="tx-amt ${t.amt>0?'pos':'neg'}">${t.amt>0?'+':'-'}${fmt(t.amt)}</div></div>`;}).join('')||'<div style="text-align:center;padding:16px;color:var(--muted);font-size:13px">☁️ Ühenda Drive ja impordi LHV väljavõte</div>';
+  buildInsights(spent,income);buildDonut();
+}
+
+function buildInsights(spent,income) {
+  const ins=[];
+  const top=categories.reduce((a,b)=>(a.spent||0)>(b.spent||0)?a:b,categories[0]);
+  if(top&&(top.spent||0)>0)ins.push({t:'info',i:'📊',msg:`Suurim kulukategooria: <b>${top.name}</b> — <b>${fmt(top.spent)}</b>.`});
+  const today=new Date(),days=new Date(today.getFullYear(),today.getMonth()+1,0).getDate();
+  const pace=activeMonth?spent:(spent/Math.max(1,today.getDate()))*days;
+  if(income>0)ins.push({t:pace>income?'warn':'good',i:'📈',msg:`Kulutustempos jõuad kuus <b>${fmt(pace)}</b> — <b>${fmt(Math.abs(pace-income))}</b> ${pace>income?'üle':'alla'} sissetuleku.`});
+  if(driveState.connected&&driveState.lastSync)ins.push({t:'good',i:'☁️',msg:`Drive sünkroonitud · ${driveState.lastSync.toLocaleTimeString('et-EE',{hour:'2-digit',minute:'2-digit'})}`});
+  document.getElementById('insights').innerHTML=ins.map(x=>`<div class="ins ${x.t}"><div class="ins-ico">${x.i}</div><div class="ins-txt">${x.msg}</div></div>`).join('')||
+    '<div class="ins info"><div class="ins-ico">☁️</div><div class="ins-txt">Vajuta <b>Ühenda</b> nuppu paremas ülanurgas, et ühendada Google Drive.</div></div>';
+}
+
+function buildDonut() {
+  const spend={};getTxsForMonth(activeMonth).filter(t=>t.amt<0).forEach(t=>{spend[t.cat]=(spend[t.cat]||0)+Math.abs(t.amt);});
+  const labs=Object.keys(spend),vals=Object.values(spend),cols=labs.map(l=>getCatByName(l).color||'#888');
+  const tot=vals.reduce((a,b)=>a+b,0);
+  document.getElementById('dn-total').textContent=fmt(tot);
+  document.getElementById('dn-leg').innerHTML=labs.map((l,i)=>`<div class="leg-item"><div class="leg-dot" style="background:${cols[i]}"></div>${l.split(' ')[0]} ${tot>0?Math.round((vals[i]/tot)*100):0}%</div>`).join('');
+  const ctx=document.getElementById('donut');if(!ctx)return;
+  if(donutCh)donutCh.destroy();
+  donutCh=new Chart(ctx,{type:'doughnut',data:{labels:labs,datasets:[{data:vals,backgroundColor:cols,borderWidth:2,borderColor:'rgba(255,255,255,.6)',hoverOffset:4}]},options:{responsive:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${fmt(c.parsed)}`}}},cutout:'66%'}});
+}
+
+function renderBudget() {
+  recalcBudgetSpent();
+  let tl=0,ts=0;categories.forEach(c=>{tl+=c.budget||0;ts+=(c.spent||0);});
+  if(activeMonth){const[y,mo]=activeMonth.split('-');document.getElementById('bud-title').textContent=MONTHS_FULL[parseInt(mo)-1]+' '+y+' eelarve';}
+  document.getElementById('bud-total').textContent=fmt(tl);
+  document.getElementById('bud-spent').textContent=fmt(ts);
+  document.getElementById('bud-rem').textContent=fmt(tl-ts);
+  document.getElementById('bud-list').innerHTML=categories.map(c=>{
+    const s=c.spent||0,p=c.budget>0?Math.min(100,Math.round((s/c.budget)*100)):0,cls=p>=100?'over':p>=80?'warn':'ok';
+    const chips=c.desc?c.desc.split(',').slice(0,5).map(k=>`<span class="kw-chip">${k.trim()}</span>`).join(''):'';
+    const more=c.desc&&c.desc.split(',').length>5?`<span class="kw-chip">+${c.desc.split(',').length-5}</span>`:'';
+    return `<div class="brow"><div class="brow-dot" style="background:${c.color};margin-top:6px"></div>
+      <div class="brow-body"><div class="brow-top"><div class="brow-name">${c.emoji} ${c.name}</div><span class="pill ${cls}">${p>=100?'Ületatud':p+'%'}</span></div>
+      ${c.desc?`<div class="kw-chips">${chips}${more}</div>`:''}
+      <div class="pbar"><div class="pfill ${cls}" style="width:${p}%"></div></div>
+      <div class="brow-sub">${fmt(s)} kulutatud · ${fmt(c.budget-s)} alles</div></div></div>`;
+  }).join('');
+}
+
+function renderGoals() {
+  document.getElementById('goals-list').innerHTML=goals.map(g=>{
+    const pct=Math.min(100,Math.round((g.saved/g.target)*100));
+    const rem=g.target-g.saved;
+    const mo=g.monthly>0?Math.ceil(rem/g.monthly):null;
+    const fin=mo?new Date(Date.now()+mo*30*24*3600*1000).toLocaleDateString('et-EE',{month:'long',year:'numeric'}):'—';
+    return `<div class="goal-card"><div class="goal-head"><div style="display:flex;align-items:center;gap:11px"><div class="goal-ic" style="background:${g.color}20">${g.icon}</div><div><div style="font-size:14px;font-weight:700">${g.name}</div><div style="font-size:11px;color:var(--muted)">${fmt(g.saved)} / ${fmt(g.target)}</div></div></div><div class="goal-pct">${pct}%</div></div><div class="pbar" style="height:7px"><div class="pfill ok" style="width:${pct}%;background:${g.color}"></div></div><div class="goal-footer"><div class="goal-stat">Kuumakse<b>${fmt(g.monthly)}</b></div><div class="goal-stat" style="text-align:center">Puudub<b>${fmt(rem)}</b></div><div class="goal-stat" style="text-align:right">Eeld. lõpp<b>${fin}</b></div></div></div>`;
+  }).join('');
+}
+
+function buildCharts() {
+  const months=getAvailableMonths().reverse();
+  const mSpend=months.map(m=>getTxsForMonth(m).filter(t=>t.amt<0).reduce((s,t)=>s+Math.abs(t.amt),0));
+  const mIncome=months.map(m=>getTxsForMonth(m).filter(t=>t.amt>0).reduce((s,t)=>s+t.amt,0));
+  const spend={};getTxsForMonth(activeMonth).filter(t=>t.amt<0).forEach(t=>{spend[t.cat]=(spend[t.cat]||0)+Math.abs(t.amt);});
+  const cats=Object.keys(spend),vals=Object.values(spend),cols=cats.map(c=>getCatByName(c).color||'#888');
+  if(activeMonth){const[y,mo]=activeMonth.split('-');document.getElementById('a-title').textContent='Kulutused — '+MONTHS_FULL[parseInt(mo)-1].toLowerCase()+' '+y;}
+  const bCtx=document.getElementById('barC');if(bCtx){if(barCh)barCh.destroy();barCh=new Chart(bCtx,{type:'bar',data:{labels:cats.map(c=>c.split(' ')[0]),datasets:[{data:vals,backgroundColor:cols,borderRadius:5,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'rgba(128,128,128,0.1)'},ticks:{callback:v=>'€'+v,font:{size:10}}}}}});}
+  document.getElementById('a-cat-list').innerHTML=cats.map((c,i)=>{const tot=vals.reduce((a,b)=>a+b,0);const cd=getCatByName(c);return `<div class="brow"><div class="brow-dot" style="background:${cols[i]}"></div><div class="brow-body"><div class="brow-top"><div class="brow-name">${cd.emoji} ${c}</div><div style="font-size:12px;font-weight:700">${fmt(vals[i])}</div></div>${cd.desc?`<div class="brow-sub">${cd.desc}</div>`:''}</div></div>`;}).join('');
+  const tCtx=document.getElementById('trendC');if(tCtx){if(trendCh)trendCh.destroy();trendCh=new Chart(tCtx,{type:'line',data:{labels:months.map(m=>{const[y,mo]=m.split('-');return MONTHS_ET[parseInt(mo)-1]+" '"+y.slice(2);}),datasets:[{label:'Kulud',data:mSpend,borderColor:'#e24b4a',backgroundColor:'rgba(226,75,74,0.07)',fill:true,tension:0.4,pointBackgroundColor:'#e24b4a',pointRadius:4},{label:'Tulud',data:mIncome,borderColor:'#1d9e75',backgroundColor:'rgba(29,158,117,0.07)',fill:true,tension:0.4,pointBackgroundColor:'#1d9e75',pointRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(128,128,128,0.1)'},ticks:{callback:v=>'€'+v,font:{size:10}}}}}});}
+  if(months.length>=2){const m1=months[months.length-2],m2=months[months.length-1];const[,mo1]=m1.split('-'),mo2=m2.split('-')[1];document.getElementById('cmp-title').textContent=MONTHS_FULL[parseInt(mo1)-1]+' vs '+MONTHS_FULL[parseInt(mo2)-1];const s1={},s2={};getTxsForMonth(m1).filter(t=>t.amt<0).forEach(t=>{s1[t.cat]=(s1[t.cat]||0)+Math.abs(t.amt);});getTxsForMonth(m2).filter(t=>t.amt<0).forEach(t=>{s2[t.cat]=(s2[t.cat]||0)+Math.abs(t.amt);});const ac=[...new Set([...Object.keys(s1),...Object.keys(s2)])];const d1=ac.map(c=>+(s1[c]||0).toFixed(2)),d2=ac.map(c=>+(s2[c]||0).toFixed(2));const cCtx=document.getElementById('cmpC');if(cCtx){if(cmpCh)cmpCh.destroy();cmpCh=new Chart(cCtx,{type:'bar',data:{labels:ac.map(c=>c.split(' ')[0]),datasets:[{label:MONTHS_ET[parseInt(mo1)-1],data:d1,backgroundColor:'rgba(83,74,183,.5)',borderRadius:4},{label:MONTHS_ET[parseInt(mo2)-1],data:d2,backgroundColor:'rgba(29,158,117,.75)',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'rgba(128,128,128,0.1)'},ticks:{callback:v=>'€'+v,font:{size:10}}}}}});}
+  const momEl=document.getElementById('mom-list');if(momEl)momEl.innerHTML=`<div style="font-size:13px;font-weight:700;margin-bottom:10px">Muutused</div>`+ac.map((c,i)=>{const d=d2[i]-d1[i],p=d1[i]>0?Math.round((d/d1[i])*100):100,up=d>0;return `<div class="brow"><div class="brow-dot" style="background:${up?'var(--danger-mid)':'var(--accent-mid)'}"></div><div class="brow-body"><div class="brow-top"><div class="brow-name">${c}</div><span style="font-size:12px;font-weight:700;color:${up?'var(--danger-mid)':'var(--accent-mid)'}">${up?'↑':'↓'} ${Math.abs(p)}%</span></div><div class="brow-sub">${fmt(d1[i])} → ${fmt(d2[i])}</div></div></div>`;}).join('');}
+}
+
+function setATab(tab,el){document.querySelectorAll('#scr-analysis .tag').forEach(t=>t.classList.remove('on'));el.classList.add('on');['breakdown','trends','compare'].forEach(t=>document.getElementById('a-'+t).style.display='none');document.getElementById('a-'+tab).style.display='block';}
+
+// ═══════════════════════════════════════════════════════════════
+// MODAALID
+// ═══════════════════════════════════════════════════════════════
+function openModal(type, editId) {
+  const ov=document.getElementById('ov'), m=document.getElementById('modal');
+  openTxId=null;
+
+  if (type==='driveSettings') {
+    const ls=driveState.lastSync?driveState.lastSync.toLocaleString('et-EE'):'—';
+    m.innerHTML=`<div class="modal-title">☁️ Google Drive</div>
+      <div class="drive-status-card">
+        <div style="font-size:36px;margin-bottom:8px">☁️</div>
+        <div style="font-size:13px;font-weight:700">${driveState.name||'Kasutaja'}</div>
+        <div style="font-size:11px;color:var(--muted)">${driveState.email||''}</div>
+      </div>
+      <div class="card">
+        <div class="drive-info-row"><span style="color:var(--muted)">Olek</span><span class="drive-info-val" style="color:var(--accent-mid)">✓ Ühendatud</span></div>
+        <div class="drive-info-row"><span style="color:var(--muted)">Viimane salvestus</span><span class="drive-info-val">${ls}</span></div>
+        <div class="drive-info-row"><span style="color:var(--muted)">Tehinguid</span><span class="drive-info-val">${txs.length}</span></div>
+        <div class="drive-info-row"><span style="color:var(--muted)">Fail</span><span class="drive-info-val" style="font-size:11px">finance-app-data-v2.json</span></div>
+      </div>
+      <button class="btn-p" style="width:100%;margin-top:12px" onclick="saveToDrive();closeModal();showBanner('success','☁️ Salvestatud!')">Salvesta kohe</button>
+      <button class="btn-outline-danger" onclick="disconnectDrive()">Katkesta ühendus</button>
+      <div class="btns"><button class="btn-c" onclick="closeModal()">Sulge</button></div>`;
+    ov.classList.add('open');
+
+  } else if (type==='tx') {
+    const t=editId?txs.find(x=>x.id===editId):null, isIncome=t&&t.amt>0;
+    const catOpts=categories.map(c=>`<option${t&&t.cat===c.name?' selected':''}>${c.name}</option>`).join('');
+    m.innerHTML=`<div class="modal-title">${t?'Muuda tehingut':'Lisa tehing'}</div>
+      ${t?`<div class="modal-sub">${fmtD(t.date)} · ${t.cat}</div>`:''}
+      <div class="field"><label>Kirjeldus</label><input type="text" id="f-name" value="${t?t.name:''}" placeholder="nt. Selver"></div>
+      <div class="row2">
+        <div class="field"><label>Summa (€)</label><input type="number" id="f-amt" value="${t?Math.abs(t.amt).toFixed(2):''}" placeholder="0.00" step="0.01"></div>
+        <div class="field"><label>Liik</label><select id="f-type"><option value="expense"${!isIncome?' selected':''}>Kulu</option><option value="income"${isIncome?' selected':''}>Tulu</option></select></div>
+      </div>
+      <div class="field"><label>Kategooria</label><select id="f-cat">${catOpts}</select></div>
+      <div class="field"><label>Kuupäev</label><input type="date" id="f-date" value="${t?t.date:new Date().toISOString().slice(0,10)}"></div>
+      <div class="btns">
+        <button class="btn-c" onclick="closeModal()">Tühista</button>
+        ${t?`<button class="btn-danger" onclick="confirmDelete(${t.id});closeModal()">Kustuta</button>`:''}
+        <button class="btn-p" onclick="saveTx(${editId||'null'})">${t?'Salvesta':'Lisa'}</button>
+      </div>`;
+    ov.classList.add('open');
+
+  } else if (type==='import') {
+    m.innerHTML=`<div class="modal-title">Impordi pangaväljavõte</div>
+      <div class="modal-sub">${driveState.connected?'Andmed salvestatakse Drive\'i automaatselt.':'Ühenda Drive, et andmed automaatselt salvestada.'}</div>
+      <button class="btn-lhv" onclick="document.getElementById('lhv-inp').click()">🏦 LHV konto väljavõte (CSV)
+        <input type="file" id="lhv-inp" accept=".csv" style="display:none" onchange="handleLHV(this)">
+      </button>
+      <div class="import-zone" onclick="document.getElementById('gen-inp').click()">
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px">📂 Muu CSV-formaat</div>
+        <div style="font-size:11px;color:var(--muted)">Veergudega: kuupäev, nimi, summa</div>
+        <input type="file" id="gen-inp" accept=".csv" style="display:none" onchange="handleGenericCSV(this)">
+      </div>
+      <div id="csv-status" style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:8px"></div>
+      <div id="cat-review"></div>
+      <div class="btns"><button class="btn-c" onclick="closeModal()">Tühista</button><button class="btn-p" id="csv-btn" onclick="importParsed()" style="display:none">Impordi</button></div>`;
+    ov.classList.add('open');
+
+  } else if (type==='categories') {
+    const rows=categories.map(c=>{const txCount=txs.filter(t=>t.cat===c.name).length;return `<div class="cat-manage-row"><div class="cat-swatch" style="background:${c.color}20;border-color:${c.color}" onclick="openModal('editCat','${c.id}')">${c.emoji}</div><div class="cat-fields"><input class="cat-name-inp" value="${c.name}" id="cni-${c.id}" onblur="commitRename('${c.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()"><textarea class="cat-desc-inp" id="cdi-${c.id}" rows="1" placeholder="märksõnad: elekter, prügi…" onblur="commitDesc('${c.id}',this.value)">${c.desc||''}</textarea></div><div class="cat-right"><input class="cat-budget-inp" type="number" value="${c.budget||0}" step="10" min="0" id="cbi-${c.id}" onchange="commitBudget('${c.id}',parseFloat(this.value)||0)"><span class="cat-tx-badge">${txCount} tx</span><button class="cat-del-btn" onclick="promptDeleteCat('${c.id}')">×</button></div></div>`;}).join('');
+    m.innerHTML=`<div class="modal-title">Halda kategooriaid</div><div class="modal-sub">Ikoon = värvivalija · nimi ja märksõnad muudetavad otse</div><div style="display:grid;grid-template-columns:1fr auto;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;padding:0 2px 0 42px"><span>Kategooria / märksõnad</span><span style="margin-right:4px">€</span></div>${rows}<button class="btn-p" style="width:100%;margin-top:14px" onclick="openModal('newCat')">+ Lisa uus kategooria</button><div class="btns" style="margin-top:8px"><button class="btn-c" onclick="closeModal()">Sulge</button></div>`;
+    ov.classList.add('open');
+
+  } else if (type==='editCat') {
+    const c=getCatById(editId);if(!c)return;newCatColor=c.color;newCatEmoji=c.emoji;
+    m.innerHTML=`<div class="modal-title">Muuda ikooni ja värvi</div><div class="modal-sub">${c.name}</div><div class="field"><label>Ikoon</label><div class="emoji-picker-row">${EMOJI_LIST.map(e=>`<div class="ep-btn${e===c.emoji?' selected':''}" onclick="selectEmoji('${e}',this)">${e}</div>`).join('')}</div></div><div class="field"><label>Värv</label><div class="color-picker-row">${PALETTE.map(col=>`<div class="color-dot${col===c.color?' selected':''}" style="background:${col}" onclick="selectColor('${col}',this)"></div>`).join('')}</div></div><div class="btns"><button class="btn-c" onclick="openModal('categories')">← Tagasi</button><button class="btn-p" onclick="applyEditCat('${editId}')">Salvesta</button></div>`;
+    ov.classList.add('open');
+
+  } else if (type==='newCat') {
+    newCatColor=PALETTE[categories.length%PALETTE.length];newCatEmoji='📦';
+    m.innerHTML=`<div class="modal-title">Uus kategooria</div><div class="field"><label>Nimi</label><input type="text" id="nc-name" placeholder="nt. Lemmikloomad"></div><div class="field"><label>Märksõnad (komaga eraldatud)</label><textarea id="nc-desc" rows="2" placeholder="nt. veterinaar, loomapood, loomasöök"></textarea><div class="hint-text">💡 LHV parser kasutab neid automaatseks kategoriseerimiseks</div></div><div class="field"><label>Eelarve (€/kuus)</label><input type="number" id="nc-budget" placeholder="0" step="10" min="0"></div><div class="field"><label>Ikoon</label><div class="emoji-picker-row">${EMOJI_LIST.map(e=>`<div class="ep-btn${e==='📦'?' selected':''}" onclick="selectEmoji('${e}',this)">${e}</div>`).join('')}</div></div><div class="field"><label>Värv</label><div class="color-picker-row">${PALETTE.map(col=>`<div class="color-dot${col===newCatColor?' selected':''}" style="background:${col}" onclick="selectColor('${col}',this)"></div>`).join('')}</div></div><div class="btns"><button class="btn-c" onclick="openModal('categories')">← Tagasi</button><button class="btn-p" onclick="saveNewCat()">Lisa</button></div>`;
+    ov.classList.add('open');
+
+  } else if (type==='deleteCat') {
+    const c=getCatById(editId);if(!c)return;const txCount=txs.filter(t=>t.cat===c.name).length;const otherOpts=categories.filter(ct=>ct.id!==editId).map(ct=>`<option value="${ct.name}">${ct.emoji} ${ct.name}</option>`).join('');
+    m.innerHTML=`<div class="modal-title">Kustuta kategooria</div><div class="modal-sub">${c.emoji} ${c.name}</div>${txCount>0?`<div class="reassign-box"><p>⚠️ ${txCount} tehingut sellel kategoorial</p><div style="font-size:12px;color:var(--muted);margin-bottom:8px">Kuhu liigutada?</div><select id="reassign-sel">${otherOpts}<option value="Muu">📦 Muu</option></select></div>`:'<div style="font-size:13px;color:var(--muted);margin-bottom:14px">Tehinguid pole. Saab ohutult kustutada.</div>'}<div class="btns"><button class="btn-c" onclick="openModal('categories')">← Tagasi</button><button class="btn-danger" onclick="execDeleteCat('${editId}')">Kustuta</button></div>`;
+    ov.classList.add('open');
+
+  } else if (type==='budget') {
+    m.innerHTML=`<div class="modal-title">Muuda eelarvet</div>${categories.map(c=>`<div class="field"><label>${c.emoji} ${c.name}</label><input type="number" id="bb_${c.id}" value="${c.budget||0}" step="10" min="0"></div>`).join('')}<div class="btns"><button class="btn-c" onclick="closeModal()">Tühista</button><button class="btn-p" onclick="saveBudgets()">Salvesta</button></div>`;
+    ov.classList.add('open');
+
+  } else if (type==='goal') {
+    m.innerHTML=`<div class="modal-title">Uus säästueesmärk</div><div class="field"><label>Eesmärgi nimi</label><input type="text" id="g-name" placeholder="nt. Perepuhkuse fond"></div><div class="row2"><div class="field"><label>Sihtsum. (€)</label><input type="number" id="g-target" placeholder="2000"></div><div class="field"><label>Kogutud (€)</label><input type="number" id="g-saved" placeholder="0"></div></div><div class="field"><label>Kuuline sissemakse (€)</label><input type="number" id="g-monthly" placeholder="150"></div><div class="btns"><button class="btn-c" onclick="closeModal()">Tühista</button><button class="btn-p" onclick="addGoal()">Loo</button></div>`;
+    ov.classList.add('open');
+  }
+}
+
+function disconnectDrive(){driveState={connected:false,token:null,email:null,name:null,fileId:null,lastSync:null,busy:false};setSyncUI('','Ühenda');closeModal();showBanner('success','Drive ühendus katkestatud');}
+function commitRename(catId,newName){const c=getCatById(catId);if(!c||!newName.trim()||newName===c.name)return;const old=c.name;txs.forEach(t=>{if(t.cat===old)t.cat=newName;});if(txCatFilter===old)txCatFilter=newName;c.name=newName.trim();recalcBudgetSpent();renderTxFilterTags();renderBudget();renderDash();scheduleSave();showBanner('success',`„${old}" → „${newName}"`);}
+function commitDesc(catId,newDesc){const c=getCatById(catId);if(!c)return;c.desc=newDesc.trim();scheduleSave();}
+function commitBudget(catId,val){const c=getCatById(catId);if(!c)return;c.budget=val;renderBudget();renderDash();scheduleSave();}
+function promptDeleteCat(catId){openModal('deleteCat',catId);}
+function execDeleteCat(catId){const c=getCatById(catId);if(!c)return;const reassignTo=document.getElementById('reassign-sel')?.value||'Muu';const count=txs.filter(t=>t.cat===c.name).length;txs.forEach(t=>{if(t.cat===c.name)t.cat=reassignTo;});categories=categories.filter(ct=>ct.id!==catId);if(txCatFilter===c.name)txCatFilter='all';closeModal();refreshAll();scheduleSave();showBanner('success',`„${c.name}" kustutatud${count>0?` — ${count} tx → „${reassignTo}"`:''}`,4000);}
+function applyEditCat(catId){const c=getCatById(catId);if(!c)return;c.color=newCatColor;c.emoji=newCatEmoji;openModal('categories');refreshAll();scheduleSave();}
+function saveNewCat(){const name=document.getElementById('nc-name')?.value.trim();const desc=document.getElementById('nc-desc')?.value.trim()||'';const budget=parseFloat(document.getElementById('nc-budget')?.value)||0;if(!name)return;if(categories.find(c=>c.name===name)){showBanner('danger','Sama nimega kategooria on juba olemas');return;}categories.push({id:'c'+Date.now(),name,emoji:newCatEmoji,color:newCatColor,budget,desc,spent:0});openModal('categories');refreshAll();scheduleSave();showBanner('success',`Uus kategooria „${name}" lisatud!`);}
+function selectColor(col,el){newCatColor=col;document.querySelectorAll('.color-dot').forEach(d=>d.classList.remove('selected'));el.classList.add('selected');}
+function selectEmoji(em,el){newCatEmoji=em;document.querySelectorAll('.ep-btn').forEach(b=>b.classList.remove('selected'));el.classList.add('selected');}
+
+function showBanner(type,msg,duration=3000){const b=document.getElementById('lhv-banner');const icon=type==='success'?'✓':type==='lhv'?'🏦':type==='danger'?'⚠️':'ℹ️';b.innerHTML=`<div class="alert-banner ${type}" style="margin-bottom:10px">${icon} ${msg}</div>`;setTimeout(()=>{if(b)b.innerHTML='';},duration);}
+
+function handleLHV(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{parsedImport=parseLHV(e.target.result);showImportPreview(parsedImport);};r.readAsText(f,'UTF-8');}
+function handleGenericCSV(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{const lines=e.target.result.replace(/^\uFEFF/,'').split('\n').filter(l=>l.trim());parsedImport=[];lines.slice(1).forEach(line=>{const cols=line.split(/[,;]/).map(c=>c.trim().replace(/^"|"$/g,''));if(cols.length<3)return;const date=cols[0],name=cols[1],amt=parseFloat(cols[2].replace(',','.'));if(!isNaN(amt)&&name)parsedImport.push({id:Date.now()+Math.random(),name,cat:autoCatDynamic(name,''),amt,date:date||new Date().toISOString().slice(0,10)});});showImportPreview(parsedImport);};r.readAsText(f);}
+
+function showImportPreview(rows){const existing=new Set(txs.map(t=>t.date+'|'+t.amt+'|'+t.name));const newRows=rows.filter(r=>!existing.has(r.date+'|'+r.amt+'|'+r.name));const dup=rows.length-newRows.length;parsedImport=newRows;document.getElementById('csv-status').innerHTML=`<b style="color:var(--accent-mid)">${newRows.length}</b> uut tehingut`+(dup>0?` · <span style="color:var(--muted)">${dup} duplikaati välja jäetud</span>`:'');const catMap={};newRows.forEach(r=>{catMap[r.cat]=(catMap[r.cat]||0)+1;});document.getElementById('cat-review').innerHTML=Object.keys(catMap).length?`<div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:7px;text-transform:uppercase;letter-spacing:.5px">Kategooriate eelvaade</div>`+Object.entries(catMap).map(([c,n])=>{const cd=getCatByName(c);return `<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span>${cd.emoji} ${c}</span><span style="color:var(--muted)">${n} tehingut</span></div>`;}).join(''):'';const btn=document.getElementById('csv-btn');if(btn){btn.style.display=newRows.length?'':'none';btn.textContent=`Impordi ${newRows.length} tehingut`;}}
+
+function importParsed(){txs=[...parsedImport,...txs].sort((a,b)=>b.date.localeCompare(a.date));const months=getAvailableMonths();activeMonth=months[0]||null;closeModal();refreshAll();renderGoals();scheduleSave();showBanner('lhv',`LHV andmed imporditud — ${parsedImport.length} tehingut lisatud`,4000);}
+function saveTx(editId){const name=document.getElementById('f-name').value.trim();const amt=parseFloat(document.getElementById('f-amt').value);const type=document.getElementById('f-type').value;const cat=document.getElementById('f-cat').value;const date=document.getElementById('f-date').value;if(!name||isNaN(amt))return;const finalAmt=type==='income'?Math.abs(amt):-Math.abs(amt);const finalCat=type==='income'?'Tulu':cat;if(editId&&editId!=='null'){const idx=txs.findIndex(t=>t.id===editId);if(idx>=0)txs[idx]={...txs[idx],name,cat:finalCat,amt:finalAmt,date};}else txs.unshift({id:Date.now(),name,cat:finalCat,amt:finalAmt,date});const months=getAvailableMonths();if(!activeMonth&&months.length)activeMonth=months[0];closeModal();renderTx();renderDash();renderBudget();scheduleSave();}
+function saveBudgets(){categories.forEach(c=>{const el=document.getElementById('bb_'+c.id);if(el)c.budget=parseFloat(el.value)||0;});closeModal();renderBudget();renderDash();scheduleSave();}
+function addGoal(){const name=document.getElementById('g-name').value.trim();const target=parseFloat(document.getElementById('g-target').value)||0;const saved=parseFloat(document.getElementById('g-saved').value)||0;const monthly=parseFloat(document.getElementById('g-monthly').value)||0;if(!name||!target)return;goals.push({id:Date.now(),name,icon:'🎯',color:'#534ab7',target,saved,monthly});closeModal();renderGoals();scheduleSave();}
+function closeModal(){document.getElementById('ov').classList.remove('open');}
+function ovClick(e){if(e.target===document.getElementById('ov'))closeModal();}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+renderTxFilterTags();
+renderDash();
+renderBudget();
+renderGoals();
+</script>
+</body>
+</html>
